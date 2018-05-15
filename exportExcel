@@ -1,0 +1,82 @@
+do 'InitParm'
+do 'WriteTitles'
+do 'WriteCells'
+
+Sub 'WriteCells'
+    For each
+		where ATemporaryCode like  &SelATemporaryCode when not &SelATemporaryCode.IsEmpty()
+		where JTemporaryCode = '诱导库存周数'
+        // Write cell values
+        if &CellRow >= 65535  //Excel2003版本的一个sheet最多支持65535行数据，当行数超过65535行时，需要新建一个sheet
+            &Sheeti += 1
+            &ExcelDocument.SelectSheet('Sheet'+&Sheeti.ToString().Trim())//新建sheet，并切换到新sheet上
+            Do 'WriteTitles'
+        endif        
+        &CellRow += 1
+		&CellCursor = 0
+        &ExcelDocument.Cells(&CellRow, &FirstColumn + &CellCursor).Text = ATemporaryCode
+		&CellCursor += 1
+        &ExcelDocument.Cells(&CellRow, &FirstColumn + &CellCursor).Text = JTemporaryCode
+		&CellCursor += 1
+		&ExcelDocument.Cells(&CellRow, &FirstColumn + &CellCursor).Text = BTemporaryCode
+		&CellCursor += 1
+		&ExcelDocument.Cells(&CellRow, &FirstColumn + &CellCursor).Text = CTemporaryCode
+		&CellCursor += 1
+        &ExcelDocument.Cells(&CellRow, &FirstColumn + &CellCursor).Number = ATemporaryQty
+		&CellCursor += 1
+        &ExcelDocument.Cells(&CellRow, &FirstColumn + &CellCursor).Number = BTemporaryQty
+		&CellCursor += 1
+    Endfor
+	&ExcelDocument.Save()
+	Do 'CheckStatus'
+	&ExcelDocument.Close()
+EndSub
+
+Sub 'WriteTitles'
+	// Write titles
+	&CellCursor = 0
+	&CellRow = 1
+	&FirstColumn = 1
+	&ExcelDocument.Cells(&CellRow, &FirstColumn + &CellCursor).Bold = True
+	&ExcelDocument.Cells(&CellRow, &FirstColumn + &CellCursor).Text = '省份编码'
+	&CellCursor += 1
+	&ExcelDocument.Cells(&CellRow, &FirstColumn + &CellCursor).Bold = True
+	&ExcelDocument.Cells(&CellRow, &FirstColumn + &CellCursor).Text = '参数类型'
+	&CellCursor += 1
+	&ExcelDocument.Cells(&CellRow, &FirstColumn + &CellCursor).Bold = True
+	&ExcelDocument.Cells(&CellRow, &FirstColumn + &CellCursor).Text = '年份'
+	&CellCursor += 1
+	&ExcelDocument.Cells(&CellRow, &FirstColumn + &CellCursor).Bold = True
+	&ExcelDocument.Cells(&CellRow, &FirstColumn + &CellCursor).Text = '季节'
+	&CellCursor += 1
+	&ExcelDocument.Cells(&CellRow, &FirstColumn + &CellCursor).Bold = True
+	&ExcelDocument.Cells(&CellRow, &FirstColumn + &CellCursor).Text = '店铺诱导库存周数'
+	&CellCursor += 1
+	&ExcelDocument.Cells(&CellRow, &FirstColumn + &CellCursor).Bold = True
+	&ExcelDocument.Cells(&CellRow, &FirstColumn + &CellCursor).Text = '分仓诱导库存周数'
+	&CellCursor += 1
+EndSub
+
+Sub 'InitParm'
+	&Random = Random() * 10000
+	&Filename =&Today.Year().ToString().Trim()+&Today.Month().ToString().Trim()+&Today.Day().ToString().Trim()+"诱导库存周数"+ &Random.ToString().Trim()
+	&ExcelTypeCode = P_GetSysParm('SysExcelType')
+	if &ExcelTypeCode = ''
+ 		&ExcelTypeCode = '.xls'
+	endif
+	&Filename += &ExcelTypeCode
+	&Filename = "Excel\Export\" + &Filename
+	&ExcelDocument.Open(&Filename)
+	Do 'CheckStatus'
+	&ExcelDocument.Clear()
+	&Sheeti = 1
+EndSub
+
+Sub 'CheckStatus'
+	If (&ExcelDocument.ErrCode <> 0)
+		&Filename = ""
+		&ErrorMessage = &ExcelDocument.ErrDescription
+		&ExcelDocument.Close()
+		Return
+	Endif
+Endsub
