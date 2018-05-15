@@ -1,0 +1,168 @@
+/*--------------主程序-------------*/
+/*1、参数初始化*/
+Do 'InitParm'
+/*2、读取Excel数据，校验表头格式，定位数据*/
+Do 'MatchTitleIndex'
+&CellRow += 1
+do while &ExcelDocument.Cells(&CellRow, &ATemporaryCode_Index).Text <> ''
+	&Flag = 0
+	Do 'ReadExcelData'
+/*3、校验Excel表内数据*/
+/*3.1、数据库数据校验*/
+	Do 'ValidateInDB'
+/*3.2、表内数值型数据格式校验*/
+	Do 'ValidateintegerFormat'	
+/*4、结束数据校验，如果正确，修改数据库,如果不正确，则提示有错误*/   
+	if &Flag = 1
+		&ErrorOutMessage = "部分数据有误，详见数据录入错误日志"
+	else
+		Do 'UpdateDB'
+	endif
+    &CellRow += 1
+enddo
+&ExcelDocument.Close()/*导入修改完毕，关闭Excel*/
+
+/*--------------Sub-------------*/
+Sub 'UpdateDB'
+	for each
+		where ATemporaryCode = &ATemporaryCode
+		where JTemporaryCode = '诱导库存周数'
+		where BTemporaryCode = &BTemporaryCode
+		where CTemporaryCode = &CTemporaryCode
+		/*逐行写入数据*/
+		if &ATemporaryQty_Index <> 0
+			ATemporaryQty=&ATemporaryQty
+		endif
+		
+		if &BTemporaryQty_Index <> 0
+			BTemporaryQty=&BTemporaryQty
+		endif
+		if &BTemporaryCode_Index <> 0
+			BTemporaryCode=&BTemporaryCode
+		endif
+		if &CTemporaryCode_Index <> 0
+			CTemporaryCode=&CTemporaryCode
+		endif
+	when none
+		/*新增记录*/
+		if 	(not &ATemporaryCode.IsEmpty())
+			New
+				ATemporaryCode=&ATemporaryCode
+				JTemporaryCode='诱导库存周数'
+				BTemporaryCode = &BTemporaryCode
+			    CTemporaryCode = &CTemporaryCode
+				ATemporaryQty=&ATemporaryQty
+				BTemporaryQty=&BTemporaryQty
+				
+				
+			EndNew
+		endif
+	endfor
+	&ErrorMessage = '导入完成'
+	commit
+EndSub
+
+Sub 'ValidateintegerFormat'
+	if &ATemporaryCode.IsEmpty() and &ATemporaryCode_Index <> 0
+		&DataErrorReason = '参数不可为空'
+		P_InsertErrorInfo.Call(&UserCode,ErrorType.ImportError,&OriginalFileName,
+		'第'+&CellRow.ToString()+'行'+','+'第'+&ATemporaryCode_Index.ToString()+'列',&DataErrorReason)
+		&Flag = 1
+	endif
+
+	if &ATemporaryQty < 0
+		&DataErrorReason = '参数值超出正常值范围'
+		P_InsertErrorInfo.Call(&UserCode,ErrorType.ImportError,&OriginalFileName,
+		'第'+&CellRow.ToString()+'行'+','+'第'+&ATemporaryQty_Index.ToString()+'列',&DataErrorReason)
+		&Flag = 1
+	endif
+
+	if &BTemporaryQty < 0
+		&DataErrorReason = '参数值超出正常值范围'
+		P_InsertErrorInfo.Call(&UserCode,ErrorType.ImportError,&OriginalFileName,
+		'第'+&CellRow.ToString()+'行'+','+'第'+&BTemporaryQty_Index.ToString()+'列',&DataErrorReason)
+		&Flag = 1
+	endif
+	if &BTemporaryCode.ToNumeric() < 0
+		&DataErrorReason = '参数值超出正常值范围'
+		P_InsertErrorInfo.Call(&UserCode,ErrorType.ImportError,&OriginalFileName,
+		'第'+&CellRow.ToString()+'行'+','+'第'+&BTemporaryCode_Index.ToString()+'列',&DataErrorReason)
+		&Flag = 1
+	endif
+	if &CTemporaryCode.ToNumeric() < 0
+		&DataErrorReason = '参数值超出正常值范围'
+		P_InsertErrorInfo.Call(&UserCode,ErrorType.ImportError,&OriginalFileName,
+		'第'+&CellRow.ToString()+'行'+','+'第'+&CTemporaryCode_Index.ToString()+'列',&DataErrorReason)
+		&Flag = 1
+	endif
+EndSub
+
+Sub  'ValidateInDB'
+//	/*(以库存表为例)*/
+//	for each
+//	   where trim(PartyCode) = trim(&PartyCode)
+//	   defined by PartyCode
+//	   when none
+//		   &Flag = 1
+//		&DataErrorReason = '组织编码不存在,拒绝写入'
+//		P_AddDataErrorLog.Call(&OriginalFileName,'组织编码',&CellRow,&PartyCode,&DataErrorReason,&DataErrorUserCode)		   
+//   endfor	
+EndSub
+
+
+Sub 'ReadExcelData'
+	&ATemporaryCode = &ExcelDocument.Cells(&CellRow,&ATemporaryCode_Index).Text
+	&BTemporaryCode = &ExcelDocument.Cells(&CellRow,&BTemporaryCode_Index).Text
+	&CTemporaryCode = &ExcelDocument.Cells(&CellRow,&CTemporaryCode_Index).Text
+	&ATemporaryQty = &ExcelDocument.Cells(&CellRow,&ATemporaryQty_Index).Number
+	&BTemporaryQty = &ExcelDocument.Cells(&CellRow,&BTemporaryQty_Index).Number
+	
+EndSub
+
+Sub 'MatchTitleIndex'
+	If (&ExcelDocument.ErrCode <> 0)
+		&ErrorMessage = &ExcelDocument.ErrDescription
+		&ExcelDocument.Close()
+		Return
+	Endif
+	
+	for &iCellIndex = 1 to 100
+		&Title = &ExcelDocument.Cells(&CellRow, &iCellIndex).Text
+		if trim(&Title) = "省份编码"
+			&ATemporaryCode_Index = &iCellIndex	
+		endif
+		if trim(&Title) = "年份"
+			&BTemporaryCode_Index=&iCellIndex
+		endif
+		if trim(&Title) = "季节"
+			&CTemporaryCode_Index=&iCellIndex
+		endif
+		if trim(&Title) = "店铺诱导库存周数"
+			&ATemporaryQty_Index = &iCellIndex	
+		endif
+	
+		if trim(&Title) = "分仓诱导库存周数"
+			&BTemporaryQty_Index = &iCellIndex	
+		endif
+		
+		
+	endfor
+	
+	&Index = &ATemporaryCode_Index * (&ATemporaryQty_Index + &BTemporaryQty_Index+&BTemporaryCode_Index+&CTemporaryCode_Index)
+	if &Index = 0
+		&ErrorMessage = '没有找到应对的列'
+		return
+	endif
+EndSub
+
+Sub 'InitParm'
+	&ExcelDocument.Open(&FilePathName)/*打开上传的Excel文件*/
+	&CellRow = 1
+	&ErrorOutMessage = ""
+	//	&Pattern = "^[0-9]*$"/*数值型正则表达式*/
+	&ATemporaryCode_Index = 0
+	&ATemporaryQty_Index = 0
+	&BTemporaryQty_Index = 0
+	&BTemporaryCode_Index=0
+	&CTemporaryCode_Index=0
+EndSub
